@@ -1,0 +1,40 @@
+# Go
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when written to stdout
+*.out
+*.tlog
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories (remove the / if you want to check in your vendor/)
+vendor/
+
+# Docker
+.dockerignore
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs and databases
+*.log
+*.sqlite
+
+# Local development/config files
+.env
+.env.local
+.env.*.local
