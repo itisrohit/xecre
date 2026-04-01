@@ -2,7 +2,6 @@ package models
 
 import "time"
 
-// structure for a code execution request.
 type ExecutionRequest struct {
 	Language string        `json:"language"`
 	Code     string        `json:"code"`
@@ -10,7 +9,6 @@ type ExecutionRequest struct {
 	Timeout  time.Duration `json:"timeout"`
 }
 
-// structure for execution output.
 type ExecutionResult struct {
 	Stdout     string        `json:"stdout"`
 	Stderr     string        `json:"stderr"`
