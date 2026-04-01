@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -14,6 +15,7 @@ import (
 
 type DockerEngine struct {
 	Client *client.Client
+	Pools  map[string]chan string
 }
 
 func NewDockerEngine() (*DockerEngine, error) {
@@ -21,63 +23,81 @@ func NewDockerEngine() (*DockerEngine, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DockerEngine{
+
+	e := &DockerEngine{
 		Client: cli,
-	}, nil
+		Pools:  make(map[string]chan string),
+	}
+
+	for lang := range runner.SupportedLanguages {
+		e.Pools[lang] = make(chan string, 10) // Optimized Pool Size
+		go e.replenishPool(context.Background(), lang)
+	}
+
+	return e, nil
+}
+
+func (e *DockerEngine) replenishPool(ctx context.Context, lang string) {
+	config := runner.SupportedLanguages[lang]
+	for {
+		resp, err := e.Client.ContainerCreate(ctx, client.ContainerCreateOptions{
+			Config: &container.Config{
+				Image: config.Image,
+				Cmd:   []string{"cat"},
+				Tty:   true,
+			},
+		})
+		if err != nil {
+			log.Printf("Create failed: %v", err)
+			continue
+		}
+
+		if _, err := e.Client.ContainerStart(ctx, resp.ID, client.ContainerStartOptions{}); err != nil {
+			log.Printf("Start failed: %v", err)
+			continue
+		}
+
+		e.Pools[lang] <- resp.ID
+	}
 }
 
 func (e *DockerEngine) Execute(ctx context.Context, req models.ExecutionRequest) (*models.ExecutionResult, error) {
-	config, ok := runner.SupportedLanguages[req.Language]
+	pool, ok := e.Pools[req.Language]
 	if !ok {
 		return nil, fmt.Errorf("unsupported language: %s", req.Language)
 	}
 
-	// Pull image if not present (Wait for it to finish)
-	res, err := e.Client.ImagePull(ctx, config.Image, client.ImagePullOptions{})
-	if err == nil {
-		for msg := range res.JSONMessages(ctx) {
-			if msg.Error != nil {
-				return nil, msg.Error
-			}
-		}
-	}
-
-	resp, err := e.Client.ContainerCreate(ctx, client.ContainerCreateOptions{
-		Config: &container.Config{
-			Image: config.Image,
-			Cmd:   []string{"sh", "-c", config.RunCmd, "exe", req.Code},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create container: %w", err)
-	}
-
-	defer e.Client.ContainerRemove(ctx, resp.ID, client.ContainerRemoveOptions{Force: true})
-
-	_, err = e.Client.ContainerStart(ctx, resp.ID, client.ContainerStartOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to start container: %w", err)
-	}
-
-	waitRes := e.Client.ContainerWait(ctx, resp.ID, client.ContainerWaitOptions{
-		Condition: container.WaitConditionNotRunning,
-	})
+	var containerID string
 	select {
-	case err := <-waitRes.Error:
-		if err != nil {
-			return nil, err
-		}
-	case <-waitRes.Result:
+	case containerID = <-pool:
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 
-	out, err := e.Client.ContainerLogs(ctx, resp.ID, client.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
+	defer func() {
+		go e.Client.ContainerRemove(context.Background(), containerID, client.ContainerRemoveOptions{Force: true})
+	}()
+
+	config := runner.SupportedLanguages[req.Language]
+	execConfig := client.ExecCreateOptions{
+		Cmd:          []string{"sh", "-c", config.RunCmd, "exe", req.Code},
+		AttachStdout: true,
+		AttachStderr: true,
+	}
+
+	execID, err := e.Client.ExecCreate(ctx, containerID, execConfig)
 	if err != nil {
 		return nil, err
 	}
-	defer out.Close()
+
+	resp, err := e.Client.ExecAttach(ctx, execID.ID, client.ExecAttachOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Close()
 
 	var stdout, stderr bytes.Buffer
-	stdcopy.StdCopy(&stdout, &stderr, out)
+	stdcopy.StdCopy(&stdout, &stderr, resp.Reader)
 
 	return &models.ExecutionResult{
 		Stdout: stdout.String(),
