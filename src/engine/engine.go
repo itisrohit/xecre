@@ -45,7 +45,7 @@ func (e *DockerEngine) Execute(ctx context.Context, req models.ExecutionRequest)
 	resp, err := e.Client.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &container.Config{
 			Image: config.Image,
-			Cmd:   []string{config.RunCmd, "-c", req.Code},
+			Cmd:   []string{"sh", "-c", config.RunCmd, "exe", req.Code},
 		},
 	})
 	if err != nil {

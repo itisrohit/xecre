@@ -8,10 +8,10 @@ type LanguageConfig struct {
 var SupportedLanguages = map[string]LanguageConfig{
 	"python": {
 		Image:  "python:3.11-alpine",
-		RunCmd: "python",
+		RunCmd: "python -c \"$1\"",
 	},
 	"javascript": {
 		Image:  "node:20-alpine",
-		RunCmd: "node",
+		RunCmd: "node -e \"$1\"",
 	},
 }
