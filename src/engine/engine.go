@@ -32,6 +32,16 @@ func (e *DockerEngine) Execute(ctx context.Context, req models.ExecutionRequest)
 		return nil, fmt.Errorf("unsupported language: %s", req.Language)
 	}
 
+	// Pull image if not present (Wait for it to finish)
+	res, err := e.Client.ImagePull(ctx, config.Image, client.ImagePullOptions{})
+	if err == nil {
+		for msg := range res.JSONMessages(ctx) {
+			if msg.Error != nil {
+				return nil, msg.Error
+			}
+		}
+	}
+
 	resp, err := e.Client.ContainerCreate(ctx, client.ContainerCreateOptions{
 		Config: &container.Config{
 			Image: config.Image,
