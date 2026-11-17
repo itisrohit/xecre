@@ -10,10 +10,12 @@ type ExecutionRequest struct {
 }
 
 type ExecutionResult struct {
-	Stdout     string        `json:"stdout"`
-	Stderr     string        `json:"stderr"`
-	ExitCode   int           `json:"exit_code"`
-	TimeTaken  time.Duration `json:"time_taken"`
-	MemoryUsed int64         `json:"memory_used"`
-	Error      string        `json:"error,omitempty"`
+	PoolWait      time.Duration `json:"pool_wait"`
+	ExecutionTime time.Duration `json:"execution_time"`
+	Stdout        string        `json:"stdout"`
+	Stderr        string        `json:"stderr"`
+	ExitCode      int           `json:"exit_code"`
+	TimeTaken     time.Duration `json:"time_taken"`
+	MemoryUsed    int64         `json:"memory_used"`
+	Error         string        `json:"error,omitempty"`
 }

@@ -1,17 +1,17 @@
 package runner
 
 type LanguageConfig struct {
-	Image  string
-	RunCmd string
+	Image   string
+	Command []string
 }
 
 var SupportedLanguages = map[string]LanguageConfig{
 	"python": {
-		Image:  "python:3.11-alpine",
-		RunCmd: "python -c \"$1\"",
+		Image:   "python:3.11-alpine",
+		Command: []string{"python", "-c"},
 	},
 	"javascript": {
-		Image:  "node:20-alpine",
-		RunCmd: "node -e \"$1\"",
+		Image:   "node:20-alpine",
+		Command: []string{"node", "-e"},
 	},
 }
